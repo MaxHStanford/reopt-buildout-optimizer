@@ -334,3 +334,14 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 6px; }
   .map-stage { height: auto; }
   #map { position: relative; height: 60vh; }
 }
+
+/* ---- week selector (detail dispatch chart) ---- */
+.week-head { display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; }
+.week-controls { display: flex; align-items: center; gap: 8px; }
+.week-controls select { font: inherit; font-size: 13px; padding: 7px 10px;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; }
+.week-controls select:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+.week-controls select option { color: #111; }
+.week-controls .btn-ghost { padding: 7px 12px; font-size: 12px; }

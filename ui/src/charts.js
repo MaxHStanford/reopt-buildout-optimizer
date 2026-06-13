@@ -11,10 +11,14 @@ export const PALETTE = {
   wind: "#57c7d0", // muted teal
   battery: "#8b93a1", // slate
   generator: "#586070", // graphite
+  gas: "#d9737a", // muted red
+  unmet: "#5b7290", // grey-blue
   load: "#e8e9e4", // off-white (on dark)
 };
 
-let dispatchChart = null;
+const HOURS_PER_WEEK = 168;
+let weekChart = null;
+let weekEv = null; // ev whose hourly series the selector slices
 let mixChart = null;
 
 function baseDefaults() {
@@ -24,42 +28,60 @@ function baseDefaults() {
     getComputedStyle(document.body).fontFamily || "system-ui, sans-serif";
 }
 
-export function renderDispatch(canvas, d) {
+// Slice one week (168 h) from a full 8760-h series and convert kW -> MW.
+const sliceMw = (arr, w) =>
+  arr.slice(w * HOURS_PER_WEEK, w * HOURS_PER_WEEK + HOURS_PER_WEEK).map((x) => x / 1000);
+
+// Interactive per-week dispatch: how each source covers the load in the chosen week.
+export function renderWeek(canvas, ev, week) {
   baseDefaults();
-  if (dispatchChart) dispatchChart.destroy();
-  const step = Math.max(1, Math.floor(d.labels.length / 12));
-  const area = (label, data, color) => ({
-    label, data, borderColor: color, backgroundColor: color + "55",
-    fill: true, stack: "s", pointRadius: 0, borderWidth: 1, tension: 0.25,
+  if (weekChart) weekChart.destroy();
+  weekEv = ev;
+  const hrs = Array.from({ length: HOURS_PER_WEEK }, (_, h) => h);
+  const loadMw = ev.loadKw / 1000;
+  const area = (label, key, color) => ({
+    label, data: sliceMw(ev.series[key], week),
+    borderColor: color, backgroundColor: color + "cc",
+    fill: true, stack: "s", pointRadius: 0, borderWidth: 0,
   });
-  dispatchChart = new Chart(canvas, {
+  weekChart = new Chart(canvas, {
     type: "line",
     data: {
-      labels: d.labels,
+      labels: hrs,
       datasets: [
-        area("Solar", d.pv, PALETTE.pv),
-        area("Wind", d.wind, PALETTE.wind),
-        area(d.hasGen ? "Generator" : "Battery", d.fill, d.hasGen ? PALETTE.generator : PALETTE.battery),
+        area("Solar", "pv", PALETTE.pv),
+        area("Wind", "wind", PALETTE.wind),
+        area("Battery", "battery", PALETTE.battery),
+        area("Gas", "gas", PALETTE.gas),
+        area("Unmet", "unmet", PALETTE.unmet),
         {
-          label: "Daily load", data: d.load, borderColor: PALETTE.load,
-          borderWidth: 2, fill: false, pointRadius: 0, borderDash: [4, 3], tension: 0.25,
+          label: "Load", data: hrs.map(() => loadMw), borderColor: PALETTE.load,
+          borderWidth: 1.5, fill: false, pointRadius: 0, borderDash: [3, 2],
         },
       ],
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { position: "bottom", labels: { boxWidth: 12, usePointStyle: true } },
-        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.raw.toFixed(1)} MWh` } },
+        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.raw.toFixed(1)} MW` } },
       },
       scales: {
-        x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: false,
-          callback(v, i) { return i % step === 0 ? this.getLabelForValue(v) : ""; } } },
-        y: { stacked: true, title: { display: true, text: "MWh / day" }, beginAtZero: true },
+        x: { grid: { display: false }, title: { display: true, text: "hour of week" },
+          ticks: { maxTicksLimit: 7 } },
+        y: { stacked: true, title: { display: true, text: "MW" }, beginAtZero: true },
       },
     },
   });
+}
+
+// Re-slice the current week chart to a different week without rebuilding it.
+export function setWeek(week) {
+  if (!weekChart || !weekEv) return;
+  const keys = ["pv", "wind", "battery", "gas", "unmet"];
+  keys.forEach((k, i) => { weekChart.data.datasets[i].data = sliceMw(weekEv.series[k], week); });
+  weekChart.update();
 }
 
 export function renderMix(canvas, ev) {

@@ -1,9 +1,10 @@
-// Leaflet map of Germany with candidate cities. The optimal city is highlighted;
-// the rest are shown muted for context. Clicking the optimal marker opens the detail view.
+// Leaflet map of Germany. The GA's best 5 cities + Munich are highlighted and
+// clickable (each opens its detail view); the other cities are shown muted for context.
 
 const COLORS = {
-  optimal: "#d8e02b", // accent (yellowish)
-  other: "#6b7280",
+  optimal: "#d8e02b", // accent (yellowish) — rank #1
+  selected: "#57c7d0", // teal — other top picks + Munich
+  other: "#6b7280", // muted context
 };
 
 let map = null;
@@ -31,54 +32,48 @@ export function renderCities(result, onPick) {
   if (layer) layer.remove();
   layer = L.layerGroup().addTo(map);
 
+  // Muted context: every city in the database that wasn't selected by the GA.
+  const picked = new Set(result.evals.map((e) => e.city.name));
+  (result.allCoords || []).forEach((c) => {
+    if (picked.has(c.name)) return;
+    L.circleMarker([c.lat, c.lon], {
+      radius: 4, color: "#fff", weight: 1,
+      fillColor: COLORS.other, fillOpacity: 0.4,
+    }).bindTooltip(c.name, { direction: "top", offset: [0, -4] }).addTo(layer);
+  });
+
+  // Highlighted picks: rank #1 in accent + halo, the rest in teal. All clickable.
   result.evals.forEach((ev) => {
     const isOpt = ev.optimal;
-    // For the optimal site, draw soft concentric rings to signal "this is the broad
-    // area / region, not the exact city centre" — the site could sit anywhere nearby.
     if (isOpt) {
-      // Outer-to-inner so inner rings paint on top. Bigger radii + clearly visible
-      // strokes so the "area, not exact city" halo actually reads at this zoom.
+      // Soft concentric rings signal "broad area / region, not exact city centre".
       [50000, 33000, 18000].forEach((radius, i) => {
         L.circle([ev.city.lat, ev.city.lon], {
           radius,
           color: COLORS.optimal,
           weight: 1.5,
-          opacity: 0.35 + i * 0.2,      // 0.35 → 0.55 → 0.75
+          opacity: 0.35 + i * 0.2,
           fillColor: COLORS.optimal,
-          fillOpacity: 0.06 + i * 0.05, // 0.06 → 0.11 → 0.16
+          fillOpacity: 0.06 + i * 0.05,
           dashArray: i === 0 ? "6 6" : null,
           interactive: false,
         }).addTo(layer);
       });
     }
     const marker = L.circleMarker([ev.city.lat, ev.city.lon], {
-      radius: isOpt ? 12 : 6,
+      radius: isOpt ? 12 : 8,
       color: "#fff",
-      weight: isOpt ? 2 : 1,
-      fillColor: isOpt ? COLORS.optimal : COLORS.other,
-      fillOpacity: isOpt ? 1 : 0.55,
+      weight: isOpt ? 2 : 1.5,
+      fillColor: isOpt ? COLORS.optimal : COLORS.selected,
+      fillOpacity: 1,
       className: isOpt ? "opt-marker" : "",
     });
     marker.bindTooltip(
-      `<b>${ev.city.name}</b>${isOpt ? " — optimal" : ""}<br>` +
-      `rank #${ev.rank} · ${ev.buildoutYears.toFixed(2)} yr · €${(ev.lcc / 1e6).toFixed(1)}M · ${Math.round(ev.co2Tonnes)} t`,
+      `<b>${ev.city.name}</b>${isOpt ? " — optimal" : ev.isMunich ? " — Munich" : ""}<br>` +
+      `rank #${ev.rank} · ${ev.buildoutYears.toFixed(2)} yr · €${(ev.lcc / 1e6).toFixed(0)}M · ${Math.round(ev.co2Tonnes)} t · click for details`,
       { direction: "top", offset: [0, -4] }
     );
-    if (isOpt) {
-      marker.bindPopup(
-        `<div class="map-pop"><div class="map-pop-name">${ev.city.name}</div>` +
-        `<div class="map-pop-tag">Optimal area · approximate</div>` +
-        `<button class="map-pop-btn">View system details →</button></div>`,
-        { closeButton: false, offset: [0, -6] }
-      );
-      marker.on("popupopen", (e) => {
-        const btn = e.popup.getElement().querySelector(".map-pop-btn");
-        if (btn) btn.addEventListener("click", () => onPick(ev));
-      });
-      marker.on("click", () => marker.openPopup());
-    } else {
-      marker.on("click", () => onPick(ev));
-    }
+    marker.on("click", () => onPick(ev));
     marker.addTo(layer);
   });
 

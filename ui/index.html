@@ -94,8 +94,8 @@
             <div class="load-field">
               <label for="load-input">Capacity</label>
               <div class="load-input-wrap">
-                <input type="number" id="load-input" min="0.001" step="0.1" value="1" />
-                <span class="suffix">GW</span>
+                <input type="number" id="load-input" min="0.001" step="1" value="100" />
+                <span class="suffix">MW</span>
               </div>
             </div>
             <div class="readout"><span class="readout-label">Annual energy</span><span id="load-readout">—</span></div>
@@ -136,8 +136,16 @@
 
       <div class="detail-grid">
         <div class="panel chart-panel wide">
-          <h3>Load &amp; supply over the year</h3>
-          <p class="hint">Daily-mean dispatch — how solar, wind, and the generator cover the load across the seasons.</p>
+          <div class="week-head">
+            <div>
+              <h3>Load &amp; supply — selected week</h3>
+              <p class="hint">Hourly dispatch — how solar, wind, battery, and gas cover the load through the chosen week.</p>
+            </div>
+            <div class="week-controls">
+              <select id="week-sel"></select>
+              <button type="button" class="btn btn-ghost" id="week-stress">Most-stressed week</button>
+            </div>
+          </div>
           <div class="chartbox tall"><canvas id="dispatchChart"></canvas></div>
         </div>
 
@@ -161,8 +169,9 @@
       </div>
 
       <p class="disclaimer">
-        Demo model: locations are ranked by a transparent off-grid techno-economic heuristic
-        using real per-city wind capacity factors and latitude-based solar — not a full MILP solve.
+        GA off-grid solve: locations are ranked by the genetic-algorithm sizing search
+        (European prices) over real per-city PV and wind production factors. Sizes, energy,
+        and costs are reported at the full displayed scale.
       </p>
     </div>
   </section>
