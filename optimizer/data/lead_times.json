@@ -1,0 +1,11 @@
+{
+  "_comment": "Dummy deployment lead times (time-to-energy) per source, in DAYS. MVP hard assumption: as soon as a source is used (any amount), its full lead time applies; system buildout time = MAX over used sources (parallel deployment). Grid is already connected (0).",
+  "units": "days",
+  "lead_times_days": {
+    "Grid": 0,
+    "PV": 90,
+    "ElectricStorage": 120,
+    "Generator": 270,
+    "Wind": 540
+  }
+}
