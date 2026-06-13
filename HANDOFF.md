@@ -165,8 +165,9 @@ with `COST_SCALE = 9.3e6` EUR (LCC spread), `CO2_SCALE = 1373` t/yr (BAU emissio
 (lifecycle present-worth factor). Cost is the numeraire (weight on LCC = 1). The actual mapping
 used for a run is recorded in `output/weight_mapping.json`.
 
-Lead times (dummy, days) in `optimizer/data/lead_times.json`:
-Grid 0, PV 90, Battery 120, Generator 270, Wind 540. Edit to taste.
+Lead times (days) in `optimizer/data/lead_times.json`, synced from the labmate fork defaults
+(commit 05983f4a): Grid 0, PV 730 (2 yr), Battery 730 (2 yr), Wind 1095 (3 yr), Generator 1460 (4 yr).
+Edit to taste. Note: Generator is now the slowest to deploy.
 
 > Note: CHP was intentionally removed from this tool. Its unit-commitment binaries made the MILP
 > much slower for little benefit in these electric-only scenarios. The labmate's fork still supports

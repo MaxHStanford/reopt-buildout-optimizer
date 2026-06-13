@@ -1,11 +1,11 @@
 {
-  "_comment": "Dummy deployment lead times (time-to-energy) per source, in DAYS. MVP hard assumption: as soon as a source is used (any amount), its full lead time applies; system buildout time = MAX over used sources (parallel deployment). Grid is already connected (0).",
+  "_comment": "Deployment lead times (time-to-energy) per source, in DAYS. Synced from labmate fork (fschweden/energy_ai_hack_DC commit 05983f4a 'Adjust default buildout times'): PV 2.0yr, ElectricStorage 2.0yr, Generator 4.0yr, Wind 3.0yr. MVP hard assumption: as soon as a source is used (any amount), its full lead time applies; system buildout time = MAX over used sources (parallel deployment). Grid is already connected (0).",
   "units": "days",
   "lead_times_days": {
     "Grid": 0,
-    "PV": 90,
-    "ElectricStorage": 120,
-    "Generator": 270,
-    "Wind": 540
+    "PV": 730,
+    "ElectricStorage": 730,
+    "Wind": 1095,
+    "Generator": 1460
   }
 }
