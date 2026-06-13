@@ -50,6 +50,11 @@ def parse_args():
     p.add_argument("--energy-rate", type=float, default=0.26)
     p.add_argument("--demand-rate", type=float, default=12.0)
     p.add_argument("--analysis-years", type=int, default=25)
+    p.add_argument("--timeout-seconds", type=int, default=60, help="solver time cap")
+    p.add_argument("--gap", type=float, default=0.10, help="MIP optimality tolerance")
+    p.add_argument("--min-load-met", type=float, default=1.0,
+                   help="off-grid: min annual fraction of load that must be served "
+                        "(<1 allows load shedding / longer under-supply, easier to solve)")
     p.add_argument("--out", default=str(HERE / "output"))
     return p.parse_args()
 
@@ -87,6 +92,12 @@ def main():
             "time_steps_per_hour": 1,
             "include_climate_in_objective": True,
             "off_grid_flag": (a.grid == "off"),
+            # keys required by the Julia /reopt HTTP endpoint (it pops these before building Settings)
+            # skip BAU off-grid (a do-nothing island can't meet load -> infeasible BAU)
+            "run_bau": (a.grid == "on"),
+            "timeout_seconds": a.timeout_seconds,
+            "optimality_tolerance": a.gap,  # loose gap; buildout binaries make
+            # optimality hard to *prove*, so we return the incumbent at the time cap
         },
         "Site": {"latitude": city["latitude"], "longitude": city["longitude"]},
         "ElectricLoad": {"doe_reference_name": a.load_profile, "annual_kwh": a.annual_kwh, "year": 2017},
@@ -111,8 +122,8 @@ def main():
             "emissions_factor_series_lb_CO2_per_kwh": co2["emissions_factor_series_lb_CO2_per_kwh"],
         }
     else:
-        # off-grid still needs a nominal tariff object in some REopt paths; keep minimal
-        scenario["ElectricTariff"] = {"blended_annual_energy_rate": a.energy_rate}
+        # off-grid: REopt forbids Meta and an ElectricTariff/ElectricUtility; drop them
+        scenario.pop("Meta", None)
 
     if a.pv == "on":
         scenario["PV"] = {
@@ -135,19 +146,38 @@ def main():
     if a.battery == "on":
         scenario["ElectricStorage"] = {
             "installed_cost_per_kw": 800.0, "installed_cost_per_kwh": 350.0,
+            "installed_cost_constant": 0.0,  # drop the fixed-cost binary -> faster MILP
             "replace_cost_per_kw": 380.0, "replace_cost_per_kwh": 180.0,
             "total_itc_fraction": 0.0, "macrs_option_years": 0,
             "can_grid_charge": (a.grid == "on"),
             "buildout_time": round(bo_years["ElectricStorage"], 4),
         }
     if a.generator == "on":
+        # off-grid needs firm dispatchable capacity >= peak load; forcing the generator min size
+        # guarantees a feasible island and gives HiGHS an easy first incumbent (else it can't find one)
+        avg_load_kw = a.annual_kwh / 8760.0
+        gen_min_kw = round(avg_load_kw * 1.05, 1) if a.grid == "off" else 0.0
+        # tight max off-grid shrinks the big-M on the 8760 hourly on/off binaries -> HiGHS solves faster
+        gen_max_kw = round(avg_load_kw * 1.5, 1) if a.grid == "off" else 5000.0
         scenario["Generator"] = {
-            "min_kw": 0.0, "max_kw": 2000.0,
+            "min_kw": gen_min_kw, "max_kw": gen_max_kw,
             "only_runs_during_grid_outage": False, "sells_energy_back_to_grid": False,
             "installed_cost_per_kw": 1000.0, "om_cost_per_kw": 20.0, "fuel_cost_per_gallon": 3.0,
+            "fuel_avail_gal": 1.0e9,  # effectively unlimited fuel so it can run continuously off-grid
+            "min_turn_down_fraction": 0.0,  # no min-loading -> avoids hourly on/off commitment binaries
             "macrs_option_years": 0,
             "buildout_time": round(bo_years["Generator"], 4),
         }
+    # off-grid relaxations: allow under-serving the load and drop operating-reserve burden
+    # (makes the island MILP feasible/easier instead of requiring ~100% load met every hour)
+    if a.grid == "off":
+        scenario["ElectricLoad"]["min_load_met_annual_fraction"] = a.min_load_met
+        scenario["ElectricLoad"]["operating_reserve_required_fraction"] = 0.0
+        scenario["ElectricLoad"]["critical_load_fraction"] = 1.0  # serve full load (match GA)
+        for t in ("PV", "Wind"):
+            if t in scenario:
+                scenario[t]["operating_reserve_required_fraction"] = 0.0
+
     # ---- map weights -> buildout_time_cost_per_year + CO2 price ----
     present_bo = [scenario[t]["buildout_time"] for t in ["PV", "Wind", "ElectricStorage", "Generator"]
                   if t in scenario]

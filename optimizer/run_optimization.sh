@@ -32,11 +32,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTDIR="$SCRIPT_DIR/output"
-CONTAINER="julia_api"
-JULIA="/usr/local/julia/bin/julia"
-PROJECT="/opt/julia_src"
+JULIA_URL="${JULIA_URL:-http://localhost:8081/reopt}"   # warm Julia REopt server
 KEYS_FILE="$SCRIPT_DIR/../REopt_API/keys.py"
-CONTAINER_RUNDIR="/opt/optimizer_run"
 
 # split script-only flags from builder args
 BUILDER_ARGS=()
@@ -52,27 +49,17 @@ done
 # resolve OUTDIR to an absolute path
 mkdir -p "$OUTDIR"; OUTDIR="$(cd "$OUTDIR" && pwd)"
 
-echo "==> 1/5 Assembling scenario"
+echo "==> 1/3 Assembling scenario"
 python3 "$SCRIPT_DIR/assemble_scenario.py" "${BUILDER_ARGS[@]}" --out "$OUTDIR"
 
 # API key for PVWatts (PV production factor); Wind uses our local series
 APIKEY="$(grep developer_nrel_gov_key "$KEYS_FILE" | head -1 | sed "s/.*=\s*'\(.*\)'.*/\1/")"
 
-echo "==> 2/5 Staging into container ($CONTAINER)"
-docker exec "$CONTAINER" sh -c "mkdir -p $CONTAINER_RUNDIR"
-docker cp "$OUTDIR/scenario.json" "$CONTAINER:$CONTAINER_RUNDIR/scenario.json"
-docker cp "$SCRIPT_DIR/run_buildout.jl" "$CONTAINER:$CONTAINER_RUNDIR/run_buildout.jl"
-
-echo "==> 3/5 Solving (buildout-time REopt fork, HiGHS) - this can take several minutes"
-docker exec -e NREL_DEVELOPER_API_KEY="$APIKEY" "$CONTAINER" \
-  "$JULIA" --project="$PROJECT" \
-  "$CONTAINER_RUNDIR/run_buildout.jl" "$CONTAINER_RUNDIR/scenario.json" "$CONTAINER_RUNDIR/results.json"
-
-echo "==> 4/5 Fetching results"
-docker cp "$CONTAINER:$CONTAINER_RUNDIR/results.json" "$OUTDIR/results.json"
+echo "==> 2/3 Solving on warm Julia server ($JULIA_URL)"
+python3 "$SCRIPT_DIR/post_solve.py" "$OUTDIR" "$APIKEY" "$JULIA_URL"
 
 if [[ "$DASHBOARD" == "1" ]]; then
-  echo "==> 5/5 Building dashboard"
+  echo "==> 3/3 Building dashboard"
   python3 "$SCRIPT_DIR/build_dashboard.py" "$OUTDIR" || echo "(dashboard HTML step failed)"
   if command -v google-chrome >/dev/null 2>&1; then
     google-chrome --headless=new --disable-gpu --no-sandbox --hide-scrollbars \
@@ -81,7 +68,7 @@ if [[ "$DASHBOARD" == "1" ]]; then
       && echo "    dashboard.png written" || echo "    (PNG render skipped)"
   fi
 else
-  echo "==> 5/5 Dashboard skipped"
+  echo "==> 3/3 Dashboard skipped"
 fi
 
 echo "==> Summary"

@@ -5,7 +5,7 @@
     "Grid": 0,
     "PV": 730,
     "ElectricStorage": 730,
-    "Wind": 1095,
+    "Wind": 1460,
     "Generator": 1460
   }
 }

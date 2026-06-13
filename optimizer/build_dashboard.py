@@ -17,6 +17,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>REopt Buildout-Time Optimization</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
  :root{--bg:#0f1420;--panel:#171f2e;--line:#2b3650;--txt:#e6edf6;--muted:#93a4bd;
   --accent:#3ea6ff;--green:#36d399;--amber:#fbbd23;--red:#f87272;--purple:#a78bfa;--grid:#5b7290;}
@@ -41,6 +43,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <div class="wrap">
  <div class="grid kpis" id="kpis"></div>
  <div class="grid charts">
+  <div class="card"><h3>Site location</h3>
+   <p class="hint" id="locHint"></p>
+   <div id="map" style="height:300px;border-radius:10px;overflow:hidden"></div></div>
   <div class="card"><h3>Lead time of built technologies</h3>
    <p class="hint">System buildout time = MAX over built techs (parallel). Tallest bar sets it.</p>
    <div class="chartbox"><canvas id="buildoutChart"></canvas></div></div>
@@ -86,6 +91,15 @@ const cards=[
 document.getElementById("kpis").innerHTML=cards.map(k=>`<div class="card kpi ${k.hero?'hero':''}">
  <div class="label">${k.label}</div><div class="val">${k.val} <span class="unit">${k.unit}</span></div>
  <div class="delta">${k.delta}</div></div>`).join("");
+// location map
+if (D.kpis.lat != null && D.kpis.lon != null && window.L) {
+  document.getElementById("locHint").textContent =
+    D.kpis.city + "  (" + D.kpis.lat.toFixed(4) + ", " + D.kpis.lon.toFixed(4) + ")";
+  const map = L.map("map", {zoomControl:true, attributionControl:false}).setView([D.kpis.lat, D.kpis.lon], 6);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:18}).addTo(map);
+  L.marker([D.kpis.lat, D.kpis.lon]).addTo(map);
+}
+
 Chart.defaults.color="#93a4bd";Chart.defaults.borderColor="#2b3650";
 Chart.defaults.font.family=getComputedStyle(document.body).fontFamily;
 
@@ -102,14 +116,22 @@ new Chart(mixChart,{type:"doughnut",data:{labels:["Time","Cost","CO2"],
  datasets:[{data:[W.time,W.cost,W.co2],backgroundColor:["#a78bfa","#3ea6ff","#36d399"]}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{tooltip:{callbacks:{label:c=>c.label+": "+(c.raw*100|0)+"%"}}}}});
 
-new Chart(billChart,{type:"bar",data:{labels:["BAU","Optimized"],
- datasets:[{label:"Energy",data:[D.cost_breakdown.bau.energy,D.cost_breakdown.opt.energy],backgroundColor:"#3ea6ff"},
-  {label:"Demand",data:[D.cost_breakdown.bau.demand,D.cost_breakdown.opt.demand],backgroundColor:"#a78bfa"}]},
- options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>"\u20ac"+(v/1000)+"k"}}},
-  plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+": \u20ac"+Math.round(c.raw).toLocaleString()}}}}});
+const offgrid = D.kpis.grid === "off";
+const hasBAU = !!(D.kpis.lcc_bau && D.kpis.lcc_bau > 0);
+const note = (id,msg)=>{const b=document.getElementById(id).closest(".chartbox");
+  b.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);text-align:center;padding:0 20px">'+msg+'</div>';};
+if (offgrid) {
+  note("billChart","Off-grid island \u2014 no utility bill (100% on-site supply).");
+} else {
+  new Chart(billChart,{type:"bar",data:{labels:["BAU","Optimized"],
+   datasets:[{label:"Energy",data:[D.cost_breakdown.bau.energy,D.cost_breakdown.opt.energy],backgroundColor:"#3ea6ff"},
+    {label:"Demand",data:[D.cost_breakdown.bau.demand,D.cost_breakdown.opt.demand],backgroundColor:"#a78bfa"}]},
+   options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>"\u20ac"+(v/1000)+"k"}}},
+    plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+": \u20ac"+Math.round(c.raw).toLocaleString()}}}}});
+}
 
-new Chart(lccChart,{type:"bar",data:{labels:["BAU","Optimized"],
- datasets:[{data:[D.kpis.lcc_bau,D.kpis.lcc],backgroundColor:["#5b7290","#36d399"]}]},
+new Chart(lccChart,{type:"bar",data:{labels: hasBAU?["BAU","Optimized"]:["Optimized"],
+ datasets:[{data: hasBAU?[D.kpis.lcc_bau,D.kpis.lcc]:[D.kpis.lcc], backgroundColor: hasBAU?["#5b7290","#36d399"]:["#36d399"]}]},
  options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>"\u20ac"+(v/1e6).toFixed(0)+"M"}}},
   plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>"\u20ac"+Math.round(c.raw).toLocaleString()}}}}});
 
@@ -118,8 +140,8 @@ new Chart(sourceChart,{type:"doughnut",data:{labels:el,
  datasets:[{data:el.map(k=>es[k]),backgroundColor:["#fbbd23","#36d399","#f87272","#a78bfa","#3ea6ff","#5b7290"]}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{tooltip:{callbacks:{label:c=>c.label+": "+f0(c.raw)+" kWh"}}}}});
 
-new Chart(co2Chart,{type:"bar",data:{labels:["BAU","Optimized"],
- datasets:[{data:[D.kpis.co2_bau,D.kpis.co2],backgroundColor:["#f87272","#36d399"]}]},
+new Chart(co2Chart,{type:"bar",data:{labels: hasBAU?["BAU","Optimized"]:["Optimized"],
+ datasets:[{data: hasBAU?[D.kpis.co2_bau,D.kpis.co2]:[D.kpis.co2], backgroundColor: hasBAU?["#f87272","#36d399"]:["#36d399"]}]},
  options:{responsive:true,maintainAspectRatio:false,scales:{y:{title:{display:true,text:"t CO2 / yr"}}},
   plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.raw||0).toFixed(0)+" t/yr"}}}}});
 
@@ -128,8 +150,10 @@ const step=Math.max(1,Math.floor(D.dispatch.labels.length/56));
 new Chart(dispatchChart,{type:"line",data:{labels:D.dispatch.labels,
  datasets:[
   {label:"Grid",data:D.dispatch.grid,backgroundColor:"rgba(91,114,144,.7)",borderColor:"#5b7290",fill:true,stack:"s",pointRadius:0,borderWidth:1},
-  {label:"Solar",data:D.dispatch.pv,backgroundColor:"rgba(251,189,35,.75)",borderColor:"#fbbd23",fill:true,stack:"s",pointRadius:0,borderWidth:1},
+  {label:"Gas generator",data:D.dispatch.gen,backgroundColor:"rgba(248,114,114,.7)",borderColor:"#f87272",fill:true,stack:"s",pointRadius:0,borderWidth:1},
   {label:"Wind",data:D.dispatch.wind,backgroundColor:"rgba(54,211,153,.6)",borderColor:"#36d399",fill:true,stack:"s",pointRadius:0,borderWidth:1},
+  {label:"Solar",data:D.dispatch.pv,backgroundColor:"rgba(251,189,35,.75)",borderColor:"#fbbd23",fill:true,stack:"s",pointRadius:0,borderWidth:1},
+  {label:"Battery",data:D.dispatch.batt,backgroundColor:"rgba(167,139,250,.7)",borderColor:"#a78bfa",fill:true,stack:"s",pointRadius:0,borderWidth:1},
   {label:"Total load",data:D.dispatch.load,borderColor:"#e6edf6",borderWidth:2,fill:false,pointRadius:0,borderDash:[4,2]}]},
  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
   scales:{x:{ticks:{maxTicksLimit:14,callback:function(v,i){return i%step===0?this.getLabelForValue(v):"";}}},
@@ -144,6 +168,12 @@ document.getElementById("foot").innerHTML=
 
 d = json.load(open(OUTDIR / "results.json"))
 wm = json.load(open(OUTDIR / "weight_mapping.json"))
+try:
+    _scen = json.load(open(OUTDIR / "scenario.json"))
+    SITE_LAT = _scen.get("Site", {}).get("latitude")
+    SITE_LON = _scen.get("Site", {}).get("longitude")
+except Exception:
+    SITE_LAT = SITE_LON = None
 
 
 def g(sec, key, default=0.0):
@@ -181,6 +211,7 @@ kpis = {
     "grid_kwh": g("ElectricUtility", "annual_energy_supplied_kwh"),
     "weights": wm["weights"], "city": wm.get("city"), "grid": wm.get("grid"), "chp": wm.get("chp"),
     "buildout_cost_per_year": wm["buildout_time_cost_per_year_eur"], "co2_price": wm["CO2_cost_per_tonne_eur"],
+    "lat": SITE_LAT, "lon": SITE_LON,
 }
 
 cost_breakdown = {
@@ -197,10 +228,12 @@ src_keys = {"PV": ("PV", "electric_to_load_series_kw"), "Wind": ("Wind", "electr
 energy_split = {label: sum(series(sec, key, n)) for label, (sec, key) in src_keys.items()}
 energy_split = {k: v for k, v in energy_split.items() if v > 1}
 
-# dispatch peak week
+# dispatch peak week - all supply-to-load sources so the stack equals the load
 pv_l = series("PV", "electric_to_load_series_kw", n)
 gr_l = series("ElectricUtility", "electric_to_load_series_kw", n)
 wd_l = series("Wind", "electric_to_load_series_kw", n)
+gn_l = series("Generator", "electric_to_load_series_kw", n)
+bt_l = series("ElectricStorage", "storage_to_load_series_kw", n)
 peak = max(range(n), key=lambda i: load_series[i]) if n else 0
 week = 168
 start = max(0, min(peak - week // 2, max(0, n - week)))
@@ -208,7 +241,8 @@ end = min(n, start + week)
 base = datetime(2017, 1, 1)
 dispatch = {
     "labels": [(base + timedelta(hours=i)).strftime("%a %H:%M") for i in range(start, end)],
-    "load": load_series[start:end], "pv": pv_l[start:end], "wind": wd_l[start:end], "grid": gr_l[start:end],
+    "load": load_series[start:end], "pv": pv_l[start:end], "wind": wd_l[start:end],
+    "grid": gr_l[start:end], "gen": gn_l[start:end], "batt": bt_l[start:end],
     "peak_label": (base + timedelta(hours=peak)).strftime("%A %b %d, %H:%M"),
 }
 
