@@ -50,25 +50,25 @@
             <div class="weight-card" style="--accent:#f2a93b">
               <div class="wc-top">
                 <label for="w-time">Time to energy</label>
-                <span class="share" id="share-time">34%</span>
+                <span class="share" id="share-time">50%</span>
               </div>
-              <input type="range" id="w-time" min="0" max="100" value="34" />
+              <input type="range" id="w-time" min="0" max="100" value="50" />
               <span class="wc-sub">How fast it goes live</span>
             </div>
             <div class="weight-card" style="--accent:#6aa0d6">
               <div class="wc-top">
                 <label for="w-cost">Lifecycle cost</label>
-                <span class="share" id="share-cost">33%</span>
+                <span class="share" id="share-cost">30%</span>
               </div>
-              <input type="range" id="w-cost" min="0" max="100" value="33" />
+              <input type="range" id="w-cost" min="0" max="100" value="30" />
               <span class="wc-sub">25-yr capex + O&amp;M</span>
             </div>
             <div class="weight-card" style="--accent:#4fbf8f">
               <div class="wc-top">
                 <label for="w-emit">Emissions</label>
-                <span class="share" id="share-emit">33%</span>
+                <span class="share" id="share-emit">20%</span>
               </div>
-              <input type="range" id="w-emit" min="0" max="100" value="33" />
+              <input type="range" id="w-emit" min="0" max="100" value="20" />
               <span class="wc-sub">Generator CO₂ / yr</span>
             </div>
           </div>
@@ -96,6 +96,13 @@
               <div class="load-input-wrap">
                 <input type="number" id="load-input" min="0.001" step="1" value="100" />
                 <span class="suffix">MW</span>
+              </div>
+            </div>
+            <div class="load-field">
+              <label for="flex-input">Flexibility</label>
+              <div class="load-input-wrap">
+                <input type="number" id="flex-input" min="1" max="100" step="1" value="99" />
+                <span class="suffix">%</span>
               </div>
             </div>
             <div class="readout"><span class="readout-label">Annual energy</span><span id="load-readout">—</span></div>

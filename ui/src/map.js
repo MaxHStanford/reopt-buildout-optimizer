@@ -25,56 +25,59 @@ export function initMap(elId) {
   return map;
 }
 
-// Render markers. `onPick` is called with the chosen city's evaluation.
+// Half-size (degrees) of the grid "cell" each city represents, drawn as a patch.
+const CELL_LAT = 0.30;
+const CELL_LON = 0.42;
+const cellBounds = (lat, lon) => [
+  [lat - CELL_LAT, lon - CELL_LON],
+  [lat + CELL_LAT, lon + CELL_LON],
+];
+
+// Main-KPI hover label: Time, Cost, CO2.
+const kpiTip = (ev) =>
+  `<b>${ev.city.name}</b>${ev.optimal ? " — optimal" : ev.isMunich ? " — Munich" : ""}` +
+  `<div class="map-kpis">` +
+  `<span><i>Time</i>${ev.buildoutYears.toFixed(2)} yr</span>` +
+  `<span><i>Cost</i>€${(ev.lcc / 1e6).toFixed(0)}M</span>` +
+  `<span><i>CO₂</i>${Math.round(ev.co2Tonnes)} t/yr</span>` +
+  `</div>`;
+
+// Render the map. `onPick` is called with the chosen city's evaluation.
+// Each city is shown as the cell region it represents (a coloured patch). The GA's
+// best 5 + Munich are highlighted with their Time/Cost/CO2 KPIs; the rest are muted.
 export function renderCities(result, onPick) {
   if (!map) return;
   map.invalidateSize(); // container may have just become visible
   if (layer) layer.remove();
   layer = L.layerGroup().addTo(map);
 
-  // Muted context: every city in the database that wasn't selected by the GA.
+  // Muted context: every city's cell that wasn't selected by the GA.
   const picked = new Set(result.evals.map((e) => e.city.name));
   (result.allCoords || []).forEach((c) => {
     if (picked.has(c.name)) return;
-    L.circleMarker([c.lat, c.lon], {
-      radius: 4, color: "#fff", weight: 1,
-      fillColor: COLORS.other, fillOpacity: 0.4,
-    }).bindTooltip(c.name, { direction: "top", offset: [0, -4] }).addTo(layer);
+    L.rectangle(cellBounds(c.lat, c.lon), {
+      color: COLORS.other, weight: 1, opacity: 0.35,
+      fillColor: COLORS.other, fillOpacity: 0.12,
+    }).bindTooltip(c.name, { sticky: true }).addTo(layer);
   });
 
-  // Highlighted picks: rank #1 in accent + halo, the rest in teal. All clickable.
+  // Highlighted picks: rank #1 in accent, the rest in teal. All clickable; hover shows KPIs.
   result.evals.forEach((ev) => {
     const isOpt = ev.optimal;
-    if (isOpt) {
-      // Soft concentric rings signal "broad area / region, not exact city centre".
-      [50000, 33000, 18000].forEach((radius, i) => {
-        L.circle([ev.city.lat, ev.city.lon], {
-          radius,
-          color: COLORS.optimal,
-          weight: 1.5,
-          opacity: 0.35 + i * 0.2,
-          fillColor: COLORS.optimal,
-          fillOpacity: 0.06 + i * 0.05,
-          dashArray: i === 0 ? "6 6" : null,
-          interactive: false,
-        }).addTo(layer);
-      });
-    }
-    const marker = L.circleMarker([ev.city.lat, ev.city.lon], {
-      radius: isOpt ? 12 : 8,
-      color: "#fff",
-      weight: isOpt ? 2 : 1.5,
-      fillColor: isOpt ? COLORS.optimal : COLORS.selected,
-      fillOpacity: 1,
-      className: isOpt ? "opt-marker" : "",
+    const color = isOpt ? COLORS.optimal : COLORS.selected;
+    const patch = L.rectangle(cellBounds(ev.city.lat, ev.city.lon), {
+      color, weight: isOpt ? 2.5 : 1.5, opacity: 0.95,
+      fillColor: color, fillOpacity: isOpt ? 0.4 : 0.28,
+      className: isOpt ? "opt-cell" : "",
     });
-    marker.bindTooltip(
-      `<b>${ev.city.name}</b>${isOpt ? " — optimal" : ev.isMunich ? " — Munich" : ""}<br>` +
-      `rank #${ev.rank} · ${ev.buildoutYears.toFixed(2)} yr · €${(ev.lcc / 1e6).toFixed(0)}M · ${Math.round(ev.co2Tonnes)} t · click for details`,
-      { direction: "top", offset: [0, -4] }
-    );
-    marker.on("click", () => onPick(ev));
-    marker.addTo(layer);
+    patch.bindTooltip(kpiTip(ev), {
+      sticky: !isOpt,
+      permanent: isOpt,
+      direction: "top",
+      className: "map-kpi-tip" + (isOpt ? " map-kpi-tip-opt" : ""),
+    });
+    patch.on("click", () => onPick(ev));
+    patch.addTo(layer);
   });
 
   const opt = result.best;

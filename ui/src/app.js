@@ -23,11 +23,12 @@ const energyReadout = (kwh) => {
 
 const state = {
   data: null,
-  weights: { time: 34, cost: 33, emit: 33 },
+  weights: { time: 50, cost: 30, emit: 20 },
   loadMw: 100,
   loadKwh: mwToKwhYr(100),
   result: null,
   stressWeek: 0,
+  avgWeek: 0,
   nweeks: 0,
 };
 
@@ -91,11 +92,13 @@ async function runOptimization() {
   const label = btn ? btn.innerHTML : "";
   if (btn) { btn.disabled = true; btn.innerHTML = "Solving with the GA…"; }
 
+  const flexPct = Math.min(100, Math.max(1, +$("#flex-input").value || 99));
+
   try {
     const resp = await fetch("/api/optimize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...state.weights, load_kw: state.loadMw * 1000 }),
+      body: JSON.stringify({ ...state.weights, load_kw: state.loadMw * 1000, min_load_met: flexPct / 100 }),
     });
     if (!resp.ok) throw new Error(`server ${resp.status}`);
     const data = await resp.json();
@@ -104,6 +107,7 @@ async function runOptimization() {
       weights: data.weights, allCoords: data.allCoords,
     };
     state.stressWeek = data.stressWeek || 0;
+    state.avgWeek = data.avgWeek || 0;
     state.nweeks = data.nweeks || 0;
   } catch (err) {
     $("#boot-error").textContent =
@@ -123,11 +127,11 @@ async function runOptimization() {
 
   const yy = years(best.buildoutYears);
   $("#opt-card").innerHTML = `
-    <div class="opt-rank">Optimal area · approximate</div>
-    <div class="opt-name">${best.city.name}<span class="opt-approx"> &amp; surroundings</span></div>
+    <div class="opt-rank">The genetic algorithm found an optimal location</div>
+    <div class="opt-name">${best.city.name}<span class="opt-approx"> region &amp; surroundings</span></div>
     <div class="opt-metrics">
-      <div><span class="dot" style="background:${PALETTE.time}"></span>${yy.value} yr <small>buildout</small></div>
-      <div><span class="dot" style="background:${PALETTE.cost}"></span>${eur(best.lcc)} <small>lifecycle</small></div>
+      <div><span class="dot" style="background:${PALETTE.time}"></span>${yy.value} yr <small>time</small></div>
+      <div><span class="dot" style="background:${PALETTE.cost}"></span>${eur(best.lcc)} <small>cost</small></div>
       <div><span class="dot" style="background:${PALETTE.emit}"></span>${tonnes(best.co2Tonnes)} t <small>CO₂/yr</small></div>
     </div>
     <button class="btn btn-primary" id="opt-detail-btn">View system details →</button>`;
@@ -150,7 +154,7 @@ function statRow(label, value, hint = "") {
     <span class="stat-val">${value}</span>${hint ? `<span class="stat-hint">${hint}</span>` : ""}</div>`;
 }
 
-function populateWeekSelector(stressWeek) {
+function populateWeekSelector(defaultWeek) {
   const sel = $("#week-sel");
   if (!sel) return;
   sel.innerHTML = "";
@@ -158,10 +162,11 @@ function populateWeekSelector(stressWeek) {
     const o = document.createElement("option");
     o.value = w;
     const month = MONTHS[Math.min(11, Math.floor(w / 4.345))];
-    o.textContent = `Week ${w + 1} (${month})` + (w === stressWeek ? " — most stressed" : "");
+    const tag = w === state.stressWeek ? " — most stressed" : w === state.avgWeek ? " — average" : "";
+    o.textContent = `Week ${w + 1} (${month})${tag}`;
     sel.appendChild(o);
   }
-  sel.value = stressWeek;
+  sel.value = defaultWeek;
 }
 
 function openDetail(ev) {
@@ -177,9 +182,9 @@ function openDetail(ev) {
     kpiCard(PALETTE.cost, "Lifecycle cost", eur(ev.lcc), "", `${CONST.YEARS}-yr · capex ${eur(ev.capex)}`) +
     kpiCard(PALETTE.emit, "Emissions", tonnes(ev.co2Tonnes), " t/yr", `gas generator only · ${pct(renewFrac)} renewable`);
 
-  // interactive per-week dispatch
-  populateWeekSelector(state.stressWeek);
-  renderWeek($("#dispatchChart"), ev, state.stressWeek);
+  // interactive per-week dispatch (default to an average week)
+  populateWeekSelector(state.avgWeek);
+  renderWeek($("#dispatchChart"), ev, state.avgWeek);
   renderMix($("#mixChart"), ev);
 
   // system composition

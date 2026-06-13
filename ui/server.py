@@ -78,7 +78,7 @@ def optimize():
 
     load_kw_display = max(1.0, float(body.get("load_kw", 100_000.0)))  # full-scale kW
     ga_load_kw = load_kw_display / SCALE
-    min_load_met = float(body.get("min_load_met", 0.80))
+    min_load_met = float(body.get("min_load_met", 0.99))
 
     cities = _city_list()
     evaluated = []
@@ -144,6 +144,7 @@ def optimize():
         })
 
     stress_week = int(np.argmin(renew_weekly)) if nweeks else 0
+    avg_week = int(np.argmin(np.abs(renew_weekly - renew_weekly.mean()))) if nweeks else 0
     all_coords = [{"name": e["city"], "lat": e["ctx"]["lat"], "lon": e["ctx"]["lon"]}
                   for e in evaluated]
 
@@ -151,6 +152,7 @@ def optimize():
         "evals": evals,
         "nweeks": nweeks,
         "stressWeek": stress_week,
+        "avgWeek": avg_week,
         "weights": norm,
         "minLoadMet": min_load_met,
         "allCoords": all_coords,
