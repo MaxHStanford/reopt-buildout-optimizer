@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>REopt · Off-Grid Buildout Optimizer</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>Off-Grid Buildout Optimizer</span>
+    </div>
+    <div class="brand-sub">Germany · time · cost · emissions</div>
+  </header>
+
+  <!-- ============ SCREEN 1: INPUTS ============ -->
+  <section id="screen-inputs" class="screen active">
+    <div class="hero">
+      <div class="hero-head">
+        <span class="eyebrow"><span class="eyebrow-dot"></span>Off-grid siting engine · Germany</span>
+        <h1>What matters most for your site?</h1>
+        <p class="lede">
+          Balance deployment <b>time</b>, lifecycle <b>cost</b>, and <b>emissions</b>. We rank
+          <b id="city-count">20</b> locations for an off-grid system and surface the best.
+        </p>
+      </div>
+      <p id="boot-error" class="error" hidden></p>
+
+      <form id="optimize-form" class="hero-panel">
+        <div class="panel-section">
+          <div class="section-head">
+            <span class="section-title"><span class="sec-no">01</span>Priority weighting</span>
+            <div class="presets">
+              <button type="button" class="preset" data-w="80,15,5">Fast build</button>
+              <button type="button" class="preset" data-w="10,80,10">Lowest cost</button>
+              <button type="button" class="preset" data-w="10,20,70">Greenest</button>
+              <button type="button" class="preset" data-w="34,33,33">Balanced</button>
+            </div>
+          </div>
+
+          <div class="weight-grid">
+            <div class="weight-card" style="--accent:#f2a93b">
+              <div class="wc-top">
+                <label for="w-time">Time to energy</label>
+                <span class="share" id="share-time">34%</span>
+              </div>
+              <input type="range" id="w-time" min="0" max="100" value="34" />
+              <span class="wc-sub">How fast it goes live</span>
+            </div>
+            <div class="weight-card" style="--accent:#6aa0d6">
+              <div class="wc-top">
+                <label for="w-cost">Lifecycle cost</label>
+                <span class="share" id="share-cost">33%</span>
+              </div>
+              <input type="range" id="w-cost" min="0" max="100" value="33" />
+              <span class="wc-sub">25-yr capex + O&amp;M</span>
+            </div>
+            <div class="weight-card" style="--accent:#4fbf8f">
+              <div class="wc-top">
+                <label for="w-emit">Emissions</label>
+                <span class="share" id="share-emit">33%</span>
+              </div>
+              <input type="range" id="w-emit" min="0" max="100" value="33" />
+              <span class="wc-sub">Generator CO₂ / yr</span>
+            </div>
+          </div>
+
+          <div class="wbar" aria-hidden="true">
+            <span id="wbar-time"></span><span id="wbar-cost"></span><span id="wbar-emit"></span>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-head">
+            <span class="section-title"><span class="sec-no">02</span>Annual electric load</span>
+          </div>
+          <div class="load-row">
+            <div class="profile-field">
+              <label for="load-profile">Profile</label>
+              <select id="load-profile">
+                <option value="baseload" selected>Baseload — flat 24/7</option>
+                <option value="upload" disabled>Upload profile… (coming soon)</option>
+                <option value="custom" disabled>Define your own… (coming soon)</option>
+              </select>
+            </div>
+            <div class="load-field">
+              <label for="load-input">Capacity</label>
+              <div class="load-input-wrap">
+                <input type="number" id="load-input" min="0.001" step="0.1" value="1" />
+                <span class="suffix">GW</span>
+              </div>
+            </div>
+            <div class="readout"><span class="readout-label">Annual energy</span><span id="load-readout">—</span></div>
+          </div>
+        </div>
+
+        <div class="panel-cta">
+          <button type="submit" class="btn btn-primary btn-lg">Find optimal location <span class="arr">→</span></button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 2: MAP ============ -->
+  <section id="screen-map" class="screen">
+    <div class="map-bar">
+      <button class="btn btn-ghost" data-nav="inputs">← Adjust inputs</button>
+      <div id="map-summary" class="map-summary"></div>
+    </div>
+    <div class="map-stage">
+      <div id="map"></div>
+      <aside id="opt-card" class="opt-card"></aside>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 3: DETAIL ============ -->
+  <section id="screen-detail" class="screen">
+    <div class="container">
+      <div class="detail-head">
+        <button class="btn btn-ghost" data-nav="map">← Back to map</button>
+        <div>
+          <h1 id="detail-title">—</h1>
+          <p class="detail-sub" id="detail-sub"></p>
+        </div>
+      </div>
+
+      <div class="kpis" id="kpis"></div>
+
+      <div class="detail-grid">
+        <div class="panel chart-panel wide">
+          <h3>Load &amp; supply over the year</h3>
+          <p class="hint">Daily-mean dispatch — how solar, wind, and the generator cover the load across the seasons.</p>
+          <div class="chartbox tall"><canvas id="dispatchChart"></canvas></div>
+        </div>
+
+        <div class="panel">
+          <h3>System composition</h3>
+          <p class="hint">Installed capacity by technology.</p>
+          <div class="stats" id="sizes"></div>
+        </div>
+
+        <div class="panel chart-panel">
+          <h3>Annual energy by source</h3>
+          <p class="hint">Share of yearly load served.</p>
+          <div class="chartbox"><canvas id="mixChart"></canvas></div>
+        </div>
+
+        <div class="panel">
+          <h3>Statistics</h3>
+          <p class="hint">Key techno-economic figures for this location.</p>
+          <div class="stats" id="stats"></div>
+        </div>
+      </div>
+
+      <p class="disclaimer">
+        Demo model: locations are ranked by a transparent off-grid techno-economic heuristic
+        using real per-city wind capacity factors and latitude-based solar — not a full MILP solve.
+      </p>
+    </div>
+  </section>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

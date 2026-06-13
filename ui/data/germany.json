@@ -1,0 +1,152 @@
+{
+ "mode": "off-grid",
+ "genEmissionKgPerKwh": 0.45,
+ "leadTimesDays": {
+  "PV": 730,
+  "ElectricStorage": 730,
+  "Wind": 1095,
+  "Generator": 1460
+ },
+ "cities": [
+  {
+   "name": "Munich",
+   "lat": 48.14,
+   "lon": 11.58,
+   "windCF": 0.2896,
+   "windKwhPerKw": 2536.6
+  },
+  {
+   "name": "Berlin",
+   "lat": 52.52,
+   "lon": 13.4,
+   "windCF": 0.4111,
+   "windKwhPerKw": 3600.9
+  },
+  {
+   "name": "Hamburg",
+   "lat": 53.55,
+   "lon": 9.99,
+   "windCF": 0.4237,
+   "windKwhPerKw": 3711.7
+  },
+  {
+   "name": "Frankfurt",
+   "lat": 50.11,
+   "lon": 8.68,
+   "windCF": 0.3333,
+   "windKwhPerKw": 2920.0
+  },
+  {
+   "name": "Cologne",
+   "lat": 50.94,
+   "lon": 6.96,
+   "windCF": 0.3585,
+   "windKwhPerKw": 3140.3
+  },
+  {
+   "name": "Stuttgart",
+   "lat": 48.78,
+   "lon": 9.18,
+   "windCF": 0.2883,
+   "windKwhPerKw": 2525.1
+  },
+  {
+   "name": "Nuremberg",
+   "lat": 49.45,
+   "lon": 11.08,
+   "windCF": 0.2676,
+   "windKwhPerKw": 2344.2
+  },
+  {
+   "name": "Dusseldorf",
+   "lat": 51.23,
+   "lon": 6.79,
+   "windCF": 0.4026,
+   "windKwhPerKw": 3526.6
+  },
+  {
+   "name": "Leipzig",
+   "lat": 51.34,
+   "lon": 12.37,
+   "windCF": 0.3878,
+   "windKwhPerKw": 3397.0
+  },
+  {
+   "name": "Dresden",
+   "lat": 51.05,
+   "lon": 13.74,
+   "windCF": 0.3028,
+   "windKwhPerKw": 2652.3
+  },
+  {
+   "name": "Hanover",
+   "lat": 52.37,
+   "lon": 9.73,
+   "windCF": 0.403,
+   "windKwhPerKw": 3529.9
+  },
+  {
+   "name": "Freiburg",
+   "lat": 47.99,
+   "lon": 7.85,
+   "windCF": 0.2829,
+   "windKwhPerKw": 2478.1
+  },
+  {
+   "name": "Bremen",
+   "lat": 53.08,
+   "lon": 8.8,
+   "windCF": 0.4072,
+   "windKwhPerKw": 3567.1
+  },
+  {
+   "name": "Dortmund",
+   "lat": 51.51,
+   "lon": 7.47,
+   "windCF": 0.4406,
+   "windKwhPerKw": 3859.5
+  },
+  {
+   "name": "Kiel",
+   "lat": 54.32,
+   "lon": 10.14,
+   "windCF": 0.4833,
+   "windKwhPerKw": 4233.9
+  },
+  {
+   "name": "Erfurt",
+   "lat": 50.98,
+   "lon": 11.03,
+   "windCF": 0.3523,
+   "windKwhPerKw": 3086.5
+  },
+  {
+   "name": "Rostock",
+   "lat": 54.09,
+   "lon": 12.14,
+   "windCF": 0.4824,
+   "windKwhPerKw": 4225.8
+  },
+  {
+   "name": "Augsburg",
+   "lat": 48.37,
+   "lon": 10.9,
+   "windCF": 0.3121,
+   "windKwhPerKw": 2734.1
+  },
+  {
+   "name": "Wiesbaden",
+   "lat": 50.08,
+   "lon": 8.24,
+   "windCF": 0.2917,
+   "windKwhPerKw": 2555.0
+  },
+  {
+   "name": "Mannheim",
+   "lat": 49.49,
+   "lon": 8.47,
+   "windCF": 0.2868,
+   "windKwhPerKw": 2512.0
+  }
+ ]
+}
